@@ -7,6 +7,7 @@ use Data::Dumper;
 use MongoDB;
 use Chart::Gnuplot;
 
+#################################Parameter Set
 #Constants
 my $G = 1;
 
@@ -29,20 +30,26 @@ my $num_particles = $num_density * ($field_size**3);
 
 my $fract_composition = {
 	"DM" => 0.95,
-	"baryonic" => 0.05
+	"baryon" => 0.05
 };
 
 #Field friction/ram pressure params
 my $field_density = 0.1;
 my $friction_coef = 0.1;
+#################################Parameter Set
 
 my @particles;
 
-init_particles();
-calc_forces();
+init_particles(); #Get initial particle states
 
-print Dumper @particles;
+#Insert into database
+my $client = MongoDB::MongoClient->new(host => 'localhost', port => 27017);
+my $db = $client->get_database('nbody');
+my $col = $db->get_collection('data');
+$col->delete_many({}); #Clear collection
+$col->insert_many(\@particles); #Insert all particles
 
+####Sanity Check, make a plot
 my $chart = Chart::Gnuplot->new(
 	output => "field.ps"
 );
@@ -63,68 +70,38 @@ $chart->plot3d($data);
 #Init particle field
 sub init_particles{
 	#Do all particle types, one at a time
+	my $id = 0;
+
 	foreach my $type(keys %$fract_composition){
 		print $type.": ".($num_particles * $fract_composition->{$type})."\n";
 
-		for(my $i = 0; $i < $num_particles * $fract_composition->{$type}; $i++){
+		for(my $i = 0; $i < $num_particles * $fract_composition->{$type}; $i++){ #For number of particles of given type
+			#Get random location inside field
 			my $x = rand($field_size / 2) - $field_size / 2;
 			my $y = rand($field_size / 2) - $field_size / 2;
 			my $z = rand($field_size / 2) - $field_size / 2;
 
 			while(grep { [$x, $y, $z] == $_->{location} }  @particles){ #Must be unique location!
+				#Try again until unique
 				my $x = rand($field_size / 2) - $field_size / 2;
     	 		my $y = rand($field_size / 2) - $field_size / 2;
      			my $z = rand($field_size / 2) - $field_size / 2;
 			}
 
-			my @location = ($x, $y, $z);
+			my @location = ($x, $y, $z); #Compose location array
 
+			#Push up to particles list
 			push(@particles, {
 				location => \@location,
 				force => [0, 0, 0],
 				velocity => [0, 0, 0],
 				type => $type,
 				t => 0,
-				mass => 1
+				mass => $particle_types->{$type}->{mass},
+				id => $id
 			});
-		}
-	}
-}
 
-#Calculate distance between two particle objects
-sub distance{
-	my ($a, $b) = @_;
-
-	return [
-		$a->{location}->[0] - $b->{location}->[0],
-		$a->{location}->[1] - $b->{location}->[1],
-		$a->{location}->[2] - $b->{location}->[2]
-	];
-}
-
-#Calculate force between two particle objects
-sub force{
-	my ($a, $b) = @_;
-
-	my $r = distance($a, $b);
-	my @f = (0, 0, 0);
-
-	$f[0] = ($G * $a->{mass} * $b->{mass}) / $r->[0]**2 if $r->[0] > 0;
-	$f[1] = ($G * $a->{mass} * $b->{mass}) / $r->[1]**2 if $r->[1] > 0;
-	$f[2] = ($G * $a->{mass} * $b->{mass}) / $r->[2]**2 if $r->[2] > 0;
-
-	return \@f;
-}
-
-sub calc_forces{
-	for(my $i = 0; $i < scalar @particles; $i++){
-		for(my $j = 0; $j < scalar @particles; $j++){
-			if($j != $i){
-				my $f = force($particles[$i], $particles[$j]);
-				$particles[$i]->{force}->[0] += $f->[0];
-				$particles[$i]->{force}->[1] += $f->[1];
-				$particles[$i]->{force}->[2] += $f->[2];
-			}
+			$id++; #Get unique id for each particle
 		}
 	}
 }
