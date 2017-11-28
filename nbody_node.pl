@@ -6,16 +6,18 @@ use warnings;
 use Data::Dumper;
 use MongoDB;
 use Chart::Gnuplot;
+use Parallel::ForkManager;
 
 #################################Parameter Set
 #Constants
-my $G = 1;
+my $G = 6.6*10**-11;
+my $sp = 1*10**-5;
 
 #N Body parameter set
 my $particle_types = {
 	"DM" => {
 		mass => 1, #Free parameter
-		density => 1 #Free parameter
+		density => 10 #Free parameter
 	},
 	"baryon" => {
 		mass => 1, #Set to neutron or quark mass
@@ -24,8 +26,8 @@ my $particle_types = {
 };
 
 #Initilization parameters
-my $field_size = 100;
-my $num_density = 0.0001;
+my $field_size = 10;
+my $num_density = 2;
 my $num_particles = $num_density * ($field_size**3);
 
 my $fract_composition = {
@@ -34,11 +36,11 @@ my $fract_composition = {
 };
 
 #Field friction/ram pressure params
-my $field_density = 0.1;
+my $field_density = 10;
 my $friction_coef = 0.1;
 
 #Time parameters
-my $dt = 1;
+my $dt = 0.1;
 my $t = 0;
 #################################Parameter Set
 
@@ -48,39 +50,86 @@ my @particles;
 my $client = MongoDB::MongoClient->new(host => 'localhost', port => 27017);
 my $db = $client->get_database('nbody');
 my $col = $db->get_collection('data');
-my $ret = $col->find(); #Find All Particles
+my $ret = $col->find({t => 0}); #Find All Particles
+$col->delete_many({t => {'$ne' => 0}});
 
 while(my $p = $ret->next){ #Push to array, for easy use later
+	delete $p->{_id};
 	push(@particles, $p);
 }
 
-#Run timestep
-#Get forces
-@particles = @{calc_forces(\@particles)};
-#Get velocity and locations
+print "Initial Energy: ".initila_energy(\@particles)."\n";
 
-# v(t) = F * (t - t0) / m + v0
-# x(t) = F * (t - t0)^2 / (2 * m) + t * v0 - t0 * v0 + x0
+#Make batches of test particles
+my $forks = 4; #Number of forks == number of batches
+my @batches; #Empty, or so you think!
 
-print Dumper @particles;
+for(my $i = 0; $i < scalar @particles; $i++){
+	$batches[$i % $forks] = [] unless $batches[$i % $forks];
+	push(@{$batches[$i % $forks]}, $particles[$i]);
+}
 
-####Sanity Check, make a plot
-my $chart = Chart::Gnuplot->new(
-	output => "field.ps"
-);
+my $pm = new Parallel::ForkManager($forks);
 
-my @x = map { $_->{location}->[0] } @particles;
-my @y = map { $_->{location}->[1] } @particles;
-my @z = map { $_->{location}->[2] } @particles;
+while($t < 1000){
+	print "t = $t\n";
 
-my $data = Chart::Gnuplot::DataSet->new(
-    xdata => \@x,
-    ydata => \@y,
-    zdata => \@z,
-    style => 'points'
-);
+	$t += $dt;
 
-$chart->plot3d($data);
+	#Run timestep
+	#@particles = @{calc_forces(\@particles)};
+	#$col->insert_many(\@particles); #Push back to DB for later use
+
+	foreach my $batch(@batches){ #For each batch
+		my $pid = $pm->start and next; #We are in fork land now, suckaaa
+		$client->reconnect; #Gotta do it to use the db in fork land, suckaa
+
+		foreach my $p(@{$batch}){
+			$p = step_particle($p->{id}, \@particles);
+			$col->insert_one($p);
+		}
+
+		$pm->finish; #...no we are not in fork land
+	}
+
+	$pm->wait_all_children; #Make sure no one else is in fork land
+
+	#Read in all particle data from db
+	my $ret = $col->find({t => $t});
+
+	while(my $p = $ret->next){ #Push to array, for easy use later
+		delete $p->{_id};
+		$particles[$p->{id}] = $p;
+	}
+
+	####Sanity Check, make a plot
+	my $t_clean = sprintf "%04d", $t;
+
+	my $chart = Chart::Gnuplot->new(
+		title => "t = $t_clean",
+		output => "plots/field.$t_clean.ps",
+		xrange => [-$field_size / 2, $field_size / 2],
+		yrange => [-$field_size / 2, $field_size / 2],
+		zrange => [-$field_size / 2, $field_size / 2],
+		bg => {
+        	color   => "#FFFFFF",
+        	density => 0.3,
+    	}
+	);	
+
+	my @x = map { $_->{location}->[0] } @particles;
+	my @y = map { $_->{location}->[1] } @particles;
+	my @z = map { $_->{location}->[2] } @particles;	
+
+	my $data = Chart::Gnuplot::DataSet->new(
+	    xdata => \@x,
+	    ydata => \@y,
+	    zdata => \@z,
+	    style => 'points'
+	);
+
+	$chart->plot3d($data);
+}
 
 #Get sign of number
 sub sign{
@@ -106,11 +155,83 @@ sub force{
 	my $r = distance($a, $b);
 	my @f = (0, 0, 0);
 
-	$f[0] = ($G * $a->{mass} * $b->{mass}) / $r->[0]**2 * sign($r->[0]) if $r->[0] > 0;
-	$f[1] = ($G * $a->{mass} * $b->{mass}) / $r->[1]**2 * sign($r->[1]) if $r->[1] > 0;
-	$f[2] = ($G * $a->{mass} * $b->{mass}) / $r->[2]**2 * sign($r->[2]) if $r->[2] > 0;
+	$f[0] = -($G * $a->{mass} * $b->{mass}) / ($r->[0] + $sp)**2 * (sign($r->[0])) if $r->[0] != 0;
+	$f[1] = -($G * $a->{mass} * $b->{mass}) / ($r->[1] + $sp)**2 * (sign($r->[1])) if $r->[1] != 0;
+	$f[2] = -($G * $a->{mass} * $b->{mass}) / ($r->[2] + $sp)**2 * (sign($r->[2])) if $r->[2] != 0;
 
 	return \@f;
+}
+
+sub initila_energy{
+	my @particls = @{$_[0]};	
+	my $E0 = 0;
+
+	for(my $i = 0; $i < scalar @particles; $i++){
+		for(my $j = 0; $j < scalar @particles; $j++){
+			if($j != $i){
+				my $p1 = $particles[$i];
+				my $p2 = $particles[$j];
+
+				my $v1 = sqrt($p1->{velocity}->[0]**2 + $p1->{velocity}->[0]**2 + $p1->{velocity}->[0]**2);
+				my $r = sqrt(($p1->{location}->[0] - $p2->{location}->[0])**2 + ($p1->{location}->[1] - $p2->{location}->[1])**2 + ($p1->{location}->[2] - $p2->{location}->[2])**2);
+
+				$E0 += ($v1**2 * $p1->{mass} * eta($p1, $p2)) / 2 - ($G * $p1->{mass} * $p2->{mass}) / $r;
+			}
+		}
+	}
+
+	return $E0;
+}
+
+sub eta{
+	my ($p1, $p2) = @_;
+
+	return (1 + ($p1->{mass} + $p2->{mass}) / $p2->{mass});
+}
+
+sub xi{
+	my ($p1, $p2) = @_;
+	my @r = (0, 0, 0);
+
+	for(my $i = 0; $i < 3; $i++){
+		$r[$i] = $G * $p1->{mass} * $dt / 2 * ($p1->{location}->[$i] - $p2->{location}->[$i])**2 + $p2->{velocity}->[$i] * $dt + $p2->{location}->[$i];
+	}
+
+	return @r;
+}
+
+#Calculate new data for one particle from all other particles
+sub step_particle{
+	my $i = $_[0];
+	my @particles = @{$_[1]};
+
+	my $p = $particles[$i];
+
+	my $n = scalar @particles - 1;
+
+	for(my $j = 0; $j < scalar @particles; $j++){
+		if($i != $j){
+			my $f = force($particles[$i], $particles[$j]);
+			$p->{force}->[0] += $f->[0];
+			$p->{force}->[1] += $f->[1];
+			$p->{force}->[2] += $f->[2];
+		}
+
+		my $now = $t + $dt;
+		$p->{t} = $now;
+
+		#Do location
+		$p->{location}->[0] = $p->{force}->[0] * ($dt)**2 / (2 * $p->{mass}) + $dt * $p->{velocity}->[0] + $p->{location}->[0];
+		$p->{location}->[1] = $p->{force}->[1] * ($dt)**2 / (2 * $p->{mass}) + $dt * $p->{velocity}->[1] + $p->{location}->[1];
+		$p->{location}->[2] = $p->{force}->[2] * ($dt)**2 / (2 * $p->{mass}) + $dt * $p->{velocity}->[2] + $p->{location}->[2];
+
+		#Do velocity
+		$p->{velocity}->[0] = $p->{force}->[0] * ($dt) / $p->{mass} + $p->{velocity}->[0];
+		$p->{velocity}->[1] = $p->{force}->[1] * ($dt) / $p->{mass} + $p->{velocity}->[1];
+		$p->{velocity}->[2] = $p->{force}->[2] * ($dt) / $p->{mass} + $p->{velocity}->[2];
+	}
+
+	return $p;
 }
 
 #Calculate force between each particle pair
@@ -118,15 +239,33 @@ sub calc_forces{
 	my @particls = @{$_[0]};
 	my @ret = @particles;
 
+	my $n = scalar @particles - 1;
+
 	for(my $i = 0; $i < scalar @particles; $i++){
+		my @xi = [0, 0, 0];
+		my $mo = 0;
+
 		for(my $j = 0; $j < scalar @particles; $j++){
 			if($j != $i){
 				my $f = force($particles[$i], $particles[$j]);
 				$ret[$i]->{force}->[0] += $f->[0];
 				$ret[$i]->{force}->[1] += $f->[1];
 				$ret[$i]->{force}->[2] += $f->[2];
+
+				$xi[0] += $ret[$j]->{location}->[0];
+				$xi[1] += $ret[$j]->{location}->[1];
+				$xi[2] += $ret[$j]->{location}->[2];
+
+				$mo += $ret[$j]->{mass};
 			}
 		}
+
+		#Do drag if baryon
+		#if($ret[$i]->{type} ne "DM"){
+		#	$ret[$i]->{force}->[0] += $field_density * $ret[$i]->{velocity}->[0]**2 * (- sign($ret[$i]->{velocity}->[0]));
+		#	$ret[$i]->{force}->[1] += $field_density * $ret[$i]->{velocity}->[1]**2 * (- sign($ret[$i]->{velocity}->[1]));
+		#	$ret[$i]->{force}->[2] += $field_density * $ret[$i]->{velocity}->[2]**2 * (- sign($ret[$i]->{velocity}->[2]));
+		#}
 
 		#Calculate v and x
 		# v(t) = F * (t - t0) / m + v0
@@ -136,15 +275,24 @@ sub calc_forces{
 		my $now = $t + $dt;
 		$ret[$i]->{t} = $now;
 
-		#Do velocity
-		$ret[$i]->{velocity}->[0] = $ret[$i]->{force}->[0] * ($dt) / $ret[$i]->{mass} + $ret[$i]->{velocity}->[0];
-		$ret[$i]->{velocity}->[1] = $ret[$i]->{force}->[1] * ($dt) / $ret[$i]->{mass} + $ret[$i]->{velocity}->[1];
-		$ret[$i]->{velocity}->[2] = $ret[$i]->{force}->[2] * ($dt) / $ret[$i]->{mass} + $ret[$i]->{velocity}->[2];
-
 		#Do location
 		$ret[$i]->{location}->[0] = $ret[$i]->{force}->[0] * ($dt)**2 / (2 * $ret[$i]->{mass}) + $dt * $ret[$i]->{velocity}->[0] + $ret[$i]->{location}->[0];
 		$ret[$i]->{location}->[1] = $ret[$i]->{force}->[1] * ($dt)**2 / (2 * $ret[$i]->{mass}) + $dt * $ret[$i]->{velocity}->[1] + $ret[$i]->{location}->[1];
 		$ret[$i]->{location}->[2] = $ret[$i]->{force}->[2] * ($dt)**2 / (2 * $ret[$i]->{mass}) + $dt * $ret[$i]->{velocity}->[2] + $ret[$i]->{location}->[2];
+
+		#Using combined energy + kinematic solution
+		#for(my $x = 0; $x <= 2; $x++){
+		#	if($n * $ret[$i]->{location}->[$x] != $xi[$x]){
+		#		$ret[$i]->{location}->[$x] = 1 / $n * (($ret[$i]->{force}->[$x] * $dt / (2 * $G * $ret[$i]->{mass} * $mo) + 1 / ($n * $ret[$i]->{location}->[$x] - $xi[$x]))**-1 + $xi[$x]);
+		#	}else{
+		#		$ret[$i]->{location}->[$x] = $xi[$x] / $n;
+		#	}
+		#}
+
+		#Do velocity
+		$ret[$i]->{velocity}->[0] = $ret[$i]->{force}->[0] * ($dt) / $ret[$i]->{mass} + $ret[$i]->{velocity}->[0];
+		$ret[$i]->{velocity}->[1] = $ret[$i]->{force}->[1] * ($dt) / $ret[$i]->{mass} + $ret[$i]->{velocity}->[1];
+		$ret[$i]->{velocity}->[2] = $ret[$i]->{force}->[2] * ($dt) / $ret[$i]->{mass} + $ret[$i]->{velocity}->[2];
 	}
 
 	return \@ret;

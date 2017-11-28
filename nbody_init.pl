@@ -14,7 +14,7 @@ my $G = 1;
 #N Body parameter set
 my $particle_types = {
 	"DM" => {
-		mass => 1, #Free parameter
+		mass => 10, #Free parameter
 		density => 1 #Free parameter
 	},
 	"baryon" => {
@@ -24,8 +24,8 @@ my $particle_types = {
 };
 
 #Initilization parameters
-my $field_size = 100;
-my $num_density = 0.0001;
+my $field_size = 10;
+my $num_density = 0.1;
 my $num_particles = $num_density * ($field_size**3);
 
 my $fract_composition = {
