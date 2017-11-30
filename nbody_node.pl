@@ -11,7 +11,7 @@ use Parallel::ForkManager;
 #################################Parameter Set
 #Constants
 my $G = 6.6*10**-11;
-my $sp = 1*10**-5;
+my $sp = 1*10**-1;
 
 #N Body parameter set
 my $particle_types = {
@@ -26,7 +26,7 @@ my $particle_types = {
 };
 
 #Initilization parameters
-my $field_size = 10;
+my $field_size = 10000;
 my $num_density = 2;
 my $num_particles = $num_density * ($field_size**3);
 
@@ -40,7 +40,7 @@ my $field_density = 10;
 my $friction_coef = 0.1;
 
 #Time parameters
-my $dt = 0.1;
+my $dt = 60;
 my $t = 0;
 #################################Parameter Set
 
@@ -71,7 +71,7 @@ for(my $i = 0; $i < scalar @particles; $i++){
 
 my $pm = new Parallel::ForkManager($forks);
 
-while($t < 1000){
+while($t < 10000000){
 	print "t = $t\n";
 
 	$t += $dt;
@@ -103,32 +103,32 @@ while($t < 1000){
 	}
 
 	####Sanity Check, make a plot
-	my $t_clean = sprintf "%04d", $t;
+	my $t_clean = sprintf "%010d", $t;
 
-	my $chart = Chart::Gnuplot->new(
-		title => "t = $t_clean",
-		output => "plots/field.$t_clean.ps",
-		xrange => [-$field_size / 2, $field_size / 2],
-		yrange => [-$field_size / 2, $field_size / 2],
-		zrange => [-$field_size / 2, $field_size / 2],
-		bg => {
-        	color   => "#FFFFFF",
-        	density => 0.3,
-    	}
-	);	
+	#my $chart = Chart::Gnuplot->new(
+	#	title => "t = $t_clean",
+	#	output => "plots/field.$t_clean.ps",
+	#	xrange => [-$field_size / 2, $field_size / 2],
+	#	yrange => [-$field_size / 2, $field_size / 2],
+	#	zrange => [-$field_size / 2, $field_size / 2],
+	#	bg => {
+    #    	color   => "#FFFFFF",
+    #    	density => 0.3,
+    #	}
+	#);	
 
-	my @x = map { $_->{location}->[0] } @particles;
-	my @y = map { $_->{location}->[1] } @particles;
-	my @z = map { $_->{location}->[2] } @particles;	
+	#my @x = map { $_->{location}->[0] } @particles;
+	#my @y = map { $_->{location}->[1] } @particles;
+	#my @z = map { $_->{location}->[2] } @particles;	
 
-	my $data = Chart::Gnuplot::DataSet->new(
-	    xdata => \@x,
-	    ydata => \@y,
-	    zdata => \@z,
-	    style => 'points'
-	);
+	#my $data = Chart::Gnuplot::DataSet->new(
+	#    xdata => \@x,
+	#    ydata => \@y,
+	#    zdata => \@z,
+	#    style => 'points'
+	#);
 
-	$chart->plot3d($data);
+	#$chart->plot3d($data);
 }
 
 #Get sign of number

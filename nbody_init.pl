@@ -24,8 +24,8 @@ my $particle_types = {
 };
 
 #Initilization parameters
-my $field_size = 10;
-my $num_density = 0.1;
+my $field_size = 100;
+my $num_density = 0.001;
 my $num_particles = $num_density * ($field_size**3);
 
 my $fract_composition = {
