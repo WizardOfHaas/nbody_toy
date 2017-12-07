@@ -40,7 +40,7 @@ my $field_density = 10;
 my $friction_coef = 0.1;
 
 #Time parameters
-my $dt = 60;
+my $dt = 60*60;
 my $t = 0;
 #################################Parameter Set
 
@@ -51,7 +51,7 @@ my $client = MongoDB::MongoClient->new(host => 'localhost', port => 27017);
 my $db = $client->get_database('nbody');
 my $col = $db->get_collection('data');
 my $ret = $col->find({t => 0}); #Find All Particles
-$col->delete_many({t => {'$ne' => 0}});
+#$col->delete_many({t => {'$ne' => 0}});
 
 while(my $p = $ret->next){ #Push to array, for easy use later
 	delete $p->{_id};
@@ -64,14 +64,31 @@ print "Initial Energy: ".initila_energy(\@particles)."\n";
 my $forks = 4; #Number of forks == number of batches
 my @batches; #Empty, or so you think!
 
+open my $out, ">", "config/source_points.dat";
+
 for(my $i = 0; $i < scalar @particles; $i++){
 	$batches[$i % $forks] = [] unless $batches[$i % $forks];
 	push(@{$batches[$i % $forks]}, $particles[$i]);
+	my $p = $particles[$i];
+	print $out
+		$p->{location}->[0]."\t".
+		$p->{location}->[1]."\t".
+		$p->{location}->[2]."\t".
+		$p->{velocity}->[0]."\t".
+		$p->{velocity}->[1]."\t".
+		$p->{velocity}->[2]."\t".
+		$p->{force}->[0]."\t".
+		$p->{force}->[1]."\t".
+		$p->{force}->[2]."\t".
+		$p->{mass}."\n";
 }
+
+close($out); #die;
 
 my $pm = new Parallel::ForkManager($forks);
 
-while($t < 10000000){
+#while($t < 10000000){
+while(1){
 	print "t = $t\n";
 
 	$t += $dt;

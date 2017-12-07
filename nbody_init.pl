@@ -10,11 +10,12 @@ use Chart::Gnuplot;
 #################################Parameter Set
 #Constants
 my $G = 1;
+my $v0 = 5;
 
 #N Body parameter set
 my $particle_types = {
 	"DM" => {
-		mass => 10, #Free parameter
+		mass => 1, #Free parameter
 		density => 1 #Free parameter
 	},
 	"baryon" => {
@@ -25,7 +26,7 @@ my $particle_types = {
 
 #Initilization parameters
 my $field_size = 100;
-my $num_density = 0.001;
+my $num_density = 0.0001;
 my $num_particles = $num_density * ($field_size**3);
 
 my $fract_composition = {
@@ -43,7 +44,13 @@ my @particles;
 init_particles(); #Get initial particle states
 
 #Insert into database
-my $client = MongoDB::MongoClient->new(host => 'localhost', port => 27017);
+my $client = MongoDB::MongoClient->new(
+	host => 'localhost',
+	port => 27017,
+	connectTimeoutMS => 10**10,
+	socketTimeoutMS => 10**10
+);
+
 my $db = $client->get_database('nbody');
 my $col = $db->get_collection('data');
 $col->delete_many({}); #Clear collection
@@ -88,13 +95,20 @@ sub init_particles{
      			my $z = rand($field_size / 2) - $field_size / 2;
 			}
 
+			#Set initial v
+			my @v = (
+				rand($v0 / 2) - $v0 / 2,
+				rand($v0 / 2) - $v0 / 2,
+				rand($v0 / 2) - $v0 / 2
+			);
+
 			my @location = ($x, $y, $z); #Compose location array
 
 			#Push up to particles list
 			push(@particles, {
 				location => \@location,
 				force => [0, 0, 0],
-				velocity => [0, 0, 0],
+				velocity => \@v,
 				type => $type,
 				t => 0,
 				mass => $particle_types->{$type}->{mass},

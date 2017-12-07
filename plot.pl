@@ -50,7 +50,9 @@ my $db = $client->get_database('nbody');
 my $col = $db->get_collection('data');
 
 #Get plot limits
-my @range = (0, $field_size);
+my $r = 1e11 + 0.1;
+my @range = (-$r, $r);
+
 my @x_range = (
 	$col->find({}, {location => 1})->sort({'location.0' => -1})->limit(1)->next->{location}->[0],
 	$col->find({}, {location => 1})->sort({'location.0' => 1})->limit(1)->next->{location}->[0]
@@ -66,22 +68,20 @@ my @z_range = (
 	$col->find({}, {location => 1})->sort({'location.2' => 1})->limit(1)->next->{location}->[2]
 );
 
+#@x_range = @range; @y_range = @range; @z_range = @range;
+
 my $ret = $col->distinct("t");
 
+my $forks = 4;
+my $pm = new Parallel::ForkManager($forks);
+
 foreach my $t(@{$ret->{_docs}}){
+	my $pid = $pm->start and next;
+	$client->reconnect;
+	
 	print "t = $t\n";
 
-	#Read in all particle data from db
-	my $ret = $col->find({t => $t});
-
-	my @particles;
-
-	while(my $p = $ret->next){ #Push to array, for easy use later
-		delete $p->{_id};
-		push(@particles, $p);
-	}
-
-	my $t_clean = sprintf "%010d", $t;
+	my $t_clean = sprintf "%015d", $t;
 
 	my $chart = Chart::Gnuplot->new(
 		title => "t = $t_clean",
@@ -93,18 +93,33 @@ foreach my $t(@{$ret->{_docs}}){
         	color   => "#FFFFFF",
         	density => 0.3,
     	}
-	);	
-
-	my @x = map { $_->{location}->[0] } @particles;
-	my @y = map { $_->{location}->[1] } @particles;
-	my @z = map { $_->{location}->[2] } @particles;	
-
-	my $data = Chart::Gnuplot::DataSet->new(
-	    xdata => \@x,
-	    ydata => \@y,
-	    zdata => \@z,
-	    style => 'points'
 	);
 
-	$chart->plot3d($data);
+	#Read in all particle data from db
+	my @plots;
+	foreach my $type(("DM", "baryon")){
+		my $ret = $col->find({t => $t, type => $type});
+	
+		my @particles;
+	
+		while(my $p = $ret->next){ #Push to array, for easy use later
+			delete $p->{_id};
+			push(@particles, $p);
+		}
+	
+		my @x = map { $_->{location}->[0] } @particles;
+		my @y = map { $_->{location}->[1] } @particles;
+		my @z = map { $_->{location}->[2] } @particles;	
+	
+		push(@plots, Chart::Gnuplot::DataSet->new(
+	    	xdata => \@x,
+	    	ydata => \@y,
+	    	zdata => \@z,
+	    	style => 'points'
+		));
+	}
+
+	$chart->plot3d(@plots);
+
+	$pm->finish;
 }
