@@ -20,7 +20,7 @@ my $particle_types = {
 		density => 10 #Free parameter
 	},
 	"baryon" => {
-		mass => 1, #Set to neutron or quark mass
+		mass => 10, #Set to neutron or quark mass
 		density => 1 #'' '' '' '' '' density
 	}
 };
@@ -40,7 +40,7 @@ my $field_density = 10;
 my $friction_coef = 0.1;
 
 #Time parameters
-my $dt = 60*60;
+my $dt = 2*24*60*60;
 my $t = 0;
 #################################Parameter Set
 
@@ -51,7 +51,7 @@ my $client = MongoDB::MongoClient->new(host => 'localhost', port => 27017);
 my $db = $client->get_database('nbody');
 my $col = $db->get_collection('data');
 my $ret = $col->find({t => 0}); #Find All Particles
-#$col->delete_many({t => {'$ne' => 0}});
+$col->delete_many({t => {'$ne' => 0}});
 
 while(my $p = $ret->next){ #Push to array, for easy use later
 	delete $p->{_id};
@@ -89,7 +89,8 @@ my $pm = new Parallel::ForkManager($forks);
 
 #while($t < 10000000){
 while(1){
-	print "t = $t\n";
+	#print "t = $t\n";
+	print $t."\t".initila_energy(\@particles)."\n";
 
 	$t += $dt;
 
@@ -120,7 +121,7 @@ while(1){
 	}
 
 	####Sanity Check, make a plot
-	my $t_clean = sprintf "%010d", $t;
+	my $t_clean = sprintf "%010f", $t;
 
 	#my $chart = Chart::Gnuplot->new(
 	#	title => "t = $t_clean",
@@ -172,9 +173,9 @@ sub force{
 	my $r = distance($a, $b);
 	my @f = (0, 0, 0);
 
-	$f[0] = -($G * $a->{mass} * $b->{mass}) / ($r->[0] + $sp)**2 * (sign($r->[0])) if $r->[0] != 0;
-	$f[1] = -($G * $a->{mass} * $b->{mass}) / ($r->[1] + $sp)**2 * (sign($r->[1])) if $r->[1] != 0;
-	$f[2] = -($G * $a->{mass} * $b->{mass}) / ($r->[2] + $sp)**2 * (sign($r->[2])) if $r->[2] != 0;
+	$f[0] = ($G * $a->{mass} * $b->{mass}) / ($r->[0] + $sp)**2 * (sign($r->[0])) if $r->[0] != 0;
+	$f[1] = ($G * $a->{mass} * $b->{mass}) / ($r->[1] + $sp)**2 * (sign($r->[1])) if $r->[1] != 0;
+	$f[2] = ($G * $a->{mass} * $b->{mass}) / ($r->[2] + $sp)**2 * (sign($r->[2])) if $r->[2] != 0;
 
 	return \@f;
 }
@@ -190,9 +191,12 @@ sub initila_energy{
 				my $p2 = $particles[$j];
 
 				my $v1 = sqrt($p1->{velocity}->[0]**2 + $p1->{velocity}->[0]**2 + $p1->{velocity}->[0]**2);
-				my $r = sqrt(($p1->{location}->[0] - $p2->{location}->[0])**2 + ($p1->{location}->[1] - $p2->{location}->[1])**2 + ($p1->{location}->[2] - $p2->{location}->[2])**2);
+				my $cr = sqrt(($p1->{location}->[0] - $p2->{location}->[0])**2 + ($p1->{location}->[1] - $p2->{location}->[1])**2 + ($p1->{location}->[2] - $p2->{location}->[2])**2);
+				my $r = sqrt($p1->{location}->[0]**2 + $p1->{location}->[1]**2 + $p1->{location}->[2]**2);
+				my $mu = ($p1->{mass} * $p2->{mass}) / ($p1->{mass} + $p2->{mass});
 
-				$E0 += ($v1**2 * $p1->{mass} * eta($p1, $p2)) / 2 - ($G * $p1->{mass} * $p2->{mass}) / $r;
+				#$E0 += ($v1**2 * $p1->{mass} * eta($p1, $p2)) / 2 - ($G * $p1->{mass} * $p2->{mass}) / $cr;
+				$E0 += $p1->{mass} * ($v1**2 / 2 + ($r**2 * ($p1->{mass} + $p2->{mass}) * $v1**2) / (2 * $mu * $cr**2 * $p2->{mass}) - ($G * $p2->{mass}) / $cr);
 			}
 		}
 	}
@@ -223,6 +227,10 @@ sub step_particle{
 	my @particles = @{$_[1]};
 
 	my $p = $particles[$i];
+
+	$p->{force}->[0] = 0;
+	$p->{force}->[1] = 0;
+	$p->{force}->[2] = 0;
 
 	my $n = scalar @particles - 1;
 

@@ -19,15 +19,16 @@ my $particle_types = {
 		density => 1 #Free parameter
 	},
 	"baryon" => {
-		mass => 1, #Set to neutron or quark mass
+		mass => 10, #Set to neutron or quark mass
 		density => 1 #'' '' '' '' '' density
 	}
 };
 
 #Initilization parameters
-my $field_size = 100;
-my $num_density = 0.0001;
-my $num_particles = $num_density * ($field_size**3);
+my $field_size = 10**15;
+my $num_density = 2**10^-2;
+#my $num_particles = $num_density * ($field_size**3);
+my $num_particles = 100;
 
 my $fract_composition = {
 	"DM" => 0.95,
@@ -84,23 +85,25 @@ sub init_particles{
 
 		for(my $i = 0; $i < $num_particles * $fract_composition->{$type}; $i++){ #For number of particles of given type
 			#Get random location inside field
-			my $x = rand($field_size / 2) - $field_size / 2;
-			my $y = rand($field_size / 2) - $field_size / 2;
-			my $z = rand($field_size / 2) - $field_size / 2;
+			my $x = rand($field_size) - $field_size / 2;
+			my $y = rand($field_size) - $field_size / 2;
+			my $z = rand($field_size) - $field_size / 2;
 
 			while(grep { [$x, $y, $z] == $_->{location} }  @particles){ #Must be unique location!
 				#Try again until unique
-				my $x = rand($field_size / 2) - $field_size / 2;
-    	 		my $y = rand($field_size / 2) - $field_size / 2;
-     			my $z = rand($field_size / 2) - $field_size / 2;
+				my $x = rand($field_size) - $field_size / 2;
+    	 		my $y = rand($field_size) - $field_size / 2;
+     			my $z = rand($field_size) - $field_size / 2;
 			}
 
 			#Set initial v
 			my @v = (
-				rand($v0 / 2) - $v0 / 2,
-				rand($v0 / 2) - $v0 / 2,
-				rand($v0 / 2) - $v0 / 2
+				rand($v0) - $v0 / 2,
+				rand($v0) - $v0 / 2,
+				rand($v0) - $v0 / 2
 			);
+
+			#@v = (0, 0, 0);
 
 			my @location = ($x, $y, $z); #Compose location array
 

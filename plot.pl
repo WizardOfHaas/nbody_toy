@@ -40,7 +40,7 @@ my $field_density = 10;
 my $friction_coef = 0.1;
 
 #Time parameters
-my $dt = 60;
+my $dt = 60*60;
 my $t = 0;
 #################################Parameter Set
 
@@ -50,7 +50,7 @@ my $db = $client->get_database('nbody');
 my $col = $db->get_collection('data');
 
 #Get plot limits
-my $r = 1e11 + 0.1;
+my $r = 100 + 0.1;
 my @range = (-$r, $r);
 
 my @x_range = (
@@ -75,13 +75,15 @@ my $ret = $col->distinct("t");
 my $forks = 4;
 my $pm = new Parallel::ForkManager($forks);
 
+`rm -rf plots/*`;
+
 foreach my $t(@{$ret->{_docs}}){
 	my $pid = $pm->start and next;
 	$client->reconnect;
 	
 	print "t = $t\n";
 
-	my $t_clean = sprintf "%015d", $t;
+	my $t_clean = sprintf "%010d", $t;
 
 	my $chart = Chart::Gnuplot->new(
 		title => "t = $t_clean",
