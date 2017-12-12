@@ -15,6 +15,12 @@ my $col = $db->get_collection('data');
 
 my $ret = $col->distinct("t");
 
+my @ts;
+my @std_r;
+my @std_v;
+my @ave_r;
+my @ave_v;
+
 foreach my $t(sort {$b <=> $a} @{$ret->{_docs}}){
 	my $d = $col->find({t => $t});
 
@@ -54,4 +60,21 @@ foreach my $t(sort {$b <=> $a} @{$ret->{_docs}}){
 		$ave_r,
 		$r_std
 	))."\n";
+
+	push(@ts, $t);
+	push(@std_r, $r_std);
+	push(@std_v, $v_std);
+	push(@ave_r, $ave_r);
+	push(@ave_v, $ave_v);
 }
+
+my $chart = Chart::Gnuplot->new(
+	output => "std_r.ps"
+);
+
+my $data = Chart::Gnuplot::DataSet->new(
+	xdata => \@ts,
+	ydata => \@std_r
+);
+
+$chart->plot2d($data);
