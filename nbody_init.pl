@@ -26,9 +26,12 @@ my $particle_types = {
 
 #Initilization parameters
 my $field_size = 10**15;
-my $num_density = 2**10^-2;
+#my $num_density = 2**10^-2;
 #my $num_particles = $num_density * ($field_size**3);
 my $num_particles = 100;
+
+my $num_density = $num_particles / $field_size**3;
+print "Number Density: ".$num_density."\n";
 
 my $fract_composition = {
 	"DM" => 0.95,
