@@ -6,6 +6,7 @@ c Setup variables
 	real, dimension(:), allocatable :: m, type
 	real, dimension(:), allocatable :: test_points
 	character(len=32) :: test_file, tmp
+	real, parameter :: sp = 10E-11
 
 c Read in initial parameters
 	open(unit = 1, file = "config/params.dat")
@@ -26,7 +27,7 @@ c Read in source points
 	end do
 	close(1)
 
-c Read in testr points
+c Read in test points
 	call getarg(1, test_file)
 	call getarg(2, tmp)
 	read(tmp, *) n_test
@@ -39,7 +40,39 @@ c Read in testr points
 	close(1)
 
 c Calculate force/location/velocity
+c 	For each test particle i
+	do i = 1, n_test
+c 		Set force components to 0
+		fx(i) = 0
+		fy(i) = 0
+		fz(i) = 0
+
+		do j = 1, n_source
+
+		if(test_points(i) /= j) then
+c 			Calculate force cuased by some source particle j
+			fx(i) = m(i) * m(j) / (x(i) - x(j) + sp)**2 * (x(i) - x(j))
+			fy(i) = m(i) * m(j) / (y(i) - y(j) + sp)**2 * (y(i) - y(j))
+			fz(i) = m(i) * m(j) / (z(i) - z(j) + sp)**2 * (z(i) - z(j))
+
+c 			Calculate new location
+			x(i) = fx(i) * (dt)**2 / (2 * m(i)) + dt * vx(i) + x(i)
+			y(i) = fy(i) * (dt)**2 / (2 * m(i)) + dt * vy(i) + y(i)
+			z(i) = fz(i) * (dt)**2 / (2 * m(i)) + dt * vz(i) + z(i)
+c 			Calculate new velocity
+			vx(i) = fx(i) * dt / m(i) + vx(i)
+			vy(i) = fy(i) * dt / m(i) + vy(i)
+			vz(i) = fz(i) * dt / m(i) + vz(i)
+		end if
+
+		end do
+	end do
 
 c Write to output
+	open(unit = 1, file = "output/source_points.dat")
+	do i = 1, n_source
+		write(1, *) x(i), y(i), z(i), vx(i), vy(i), vz(i), fx(i), fy(i), fz(i), m(i)
+	end do
+	close(1)
 
 	end
