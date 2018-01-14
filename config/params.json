@@ -1,0 +1,17 @@
+{
+	"sp": 1E-1,
+	"num_particles": 100,
+	"field_size": 1E15,
+	"particle_types": {
+		"DM": {
+			"mass": 1
+		},
+		"baryon": {
+			"mass": 1
+		}
+	},
+	"fract_composition": {
+		"DM": 0.95,
+		"baryon": 0.05
+	}
+}

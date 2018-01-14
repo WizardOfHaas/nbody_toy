@@ -7,6 +7,7 @@ c Setup variables
 	real, dimension(:), allocatable :: test_points
 	character(len=32) :: test_file, tmp
 	real, parameter :: sp = 10E-11
+	integer :: tid
 
 c Read in initial parameters
 	open(unit = 1, file = "config/params.dat")
@@ -28,8 +29,8 @@ c Read in source points
 	close(1)
 
 c Read in test points
-	call getarg(1, test_file)
-	call getarg(2, tmp)
+	call getarg(1, test_file) !Arg 1 - test point file
+	call getarg(2, tmp) !Arg 2 - # test points
 	read(tmp, *) n_test
 	allocate(test_points(n_test))
 
@@ -39,7 +40,11 @@ c Read in test points
 	end do
 	close(1)
 
-c Calculate force/location/velocity
+c Calculate force/location/velocity in parallel
+!$OMP PARALLEL PRIVATE(TID) NUM_THREADS 4
+c 	Get thread ID
+	tid = omp_get_thread_num()
+
 c 	For each test particle i
 	do i = 1, n_test
 c 		Set force components to 0
@@ -67,6 +72,7 @@ c 			Calculate new velocity
 
 		end do
 	end do
+!$OMP END PARALLEL
 
 c Write to output
 	open(unit = 1, file = "output/source_points.dat")

@@ -44,6 +44,11 @@ my $dt = 100*24*60*60;
 my $t = 0;
 #################################Parameter Set
 
+#################################Write config files for FORTRAN
+open my $fh, ">", "config/params.dat";
+print $fh $num_particles;
+#################################
+
 my @particles;
 
 #Pull from database
@@ -64,89 +69,66 @@ print "Initial Energy: ".initila_energy(\@particles)."\n";
 my $forks = 30; #Number of forks == number of batches
 my @batches; #Empty, or so you think!
 
-open my $out, ">", "config/source_points.dat";
-
-for(my $i = 0; $i < scalar @particles; $i++){
-	$batches[$i % $forks] = [] unless $batches[$i % $forks];
-	push(@{$batches[$i % $forks]}, $particles[$i]);
-	my $p = $particles[$i];
-	#print $out
-	#	$p->{location}->[0]."\t".
-	#	$p->{location}->[1]."\t".
-	#	$p->{location}->[2]."\t".
-	#	$p->{velocity}->[0]."\t".
-	#	$p->{velocity}->[1]."\t".
-	#	$p->{velocity}->[2]."\t".
-	#	$p->{force}->[0]."\t".
-	#	$p->{force}->[1]."\t".
-	#	$p->{force}->[2]."\t".
-	#	$p->{mass}."\n";
-}
-
-close($out); #die;
-
 my $pm = new Parallel::ForkManager($forks);
 
-#while($t < 10000000){
 while(1){
 	print "t = $t\n";
-	#print $t."\t".initila_energy(\@particles)."\n";
+	write_configs();
 
 	$t += $dt;
+
+
 
 	#Run timestep
 	#@particles = @{calc_forces(\@particles)};
 	#$col->insert_many(\@particles); #Push back to DB for later use
 
-	foreach my $batch(@batches){ #For each batch
-		my $pid = $pm->start and next; #We are in fork land now, suckaaa
-		$client->reconnect; #Gotta do it to use the db in fork land, suckaa
+	#foreach my $batch(@batches){ #For each batch
+	#	my $pid = $pm->start and next; #We are in fork land now, suckaaa
+	#	$client->reconnect; #Gotta do it to use the db in fork land, suckaa
 
-		foreach my $p(@{$batch}){
-			$p = step_particle($p->{id}, \@particles);
-			$col->insert_one($p);
-		}
+	#	foreach my $p(@{$batch}){
+	#		$p = step_particle($p->{id}, \@particles);
+	#		$col->insert_one($p);
+	#	}
 
-		$pm->finish; #...no we are not in fork land
-	}
+	#	$pm->finish; #...no we are not in fork land
+	#}
 
-	$pm->wait_all_children; #Make sure no one else is in fork land
+	#$pm->wait_all_children; #Make sure no one else is in fork land
 
 	#Read in all particle data from db
-	my $ret = $col->find({t => $t});
+	#my $ret = $col->find({t => $t});
 
-	while(my $p = $ret->next){ #Push to array, for easy use later
-		delete $p->{_id};
-		$particles[$p->{id}] = $p;
+	#while(my $p = $ret->next){ #Push to array, for easy use later
+	#	delete $p->{_id};
+	#	$particles[$p->{id}] = $p;
+	#}
+}
+
+#Write out data for FORTRAN code
+sub write_configs{
+	#Write out source point data
+	open my $out, ">", "config/source_points.dat";
+
+	for(my $i = 0; $i < scalar @particles; $i++){
+		$batches[$i % $forks] = [] unless $batches[$i % $forks];
+		push(@{$batches[$i % $forks]}, $particles[$i]);
+		my $p = $particles[$i];
+		print $out
+			$p->{location}->[0]."\t".
+			$p->{location}->[1]."\t".
+			$p->{location}->[2]."\t".
+			$p->{velocity}->[0]."\t".
+			$p->{velocity}->[1]."\t".
+			$p->{velocity}->[2]."\t".
+			$p->{force}->[0]."\t".
+			$p->{force}->[1]."\t".
+			$p->{force}->[2]."\t".
+			$p->{mass}."\n";
 	}
 
-	####Sanity Check, make a plot
-	my $t_clean = sprintf "%010f", $t;
-
-	#my $chart = Chart::Gnuplot->new(
-	#	title => "t = $t_clean",
-	#	output => "plots/field.$t_clean.ps",
-	#	xrange => [-$field_size / 2, $field_size / 2],
-	#	yrange => [-$field_size / 2, $field_size / 2],
-	#	zrange => [-$field_size / 2, $field_size / 2],
-	#	bg => {
-    #    	color   => "#FFFFFF",
-    #    	density => 0.3,
-    #	}
-	#);	
-
-	#my @x = map { $_->{location}->[0] } @particles;
-	#my @y = map { $_->{location}->[1] } @particles;
-	#my @z = map { $_->{location}->[2] } @particles;	
-
-	#my $data = Chart::Gnuplot::DataSet->new(
-	#    xdata => \@x,
-	#    ydata => \@y,
-	#    zdata => \@z,
-	#    style => 'points'
-	#);
-
-	#$chart->plot3d($data);
+	close($out);
 }
 
 #Get sign of number
