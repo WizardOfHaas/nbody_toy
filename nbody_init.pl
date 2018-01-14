@@ -6,6 +6,11 @@ use warnings;
 use Data::Dumper;
 use MongoDB;
 use Chart::Gnuplot;
+use JSON qw(decode_json);
+
+open my $fh, "<", $ARGV[0];
+my $cfg = decode_json(join("\n", <$fh>));
+close $fh;
 
 #################################Parameter Set
 #Constants
@@ -46,19 +51,6 @@ my $friction_coef = 0.1;
 my @particles;
 
 init_particles(); #Get initial particle states
-
-#Insert into database
-my $client = MongoDB::MongoClient->new(
-	host => 'localhost',
-	port => 27017,
-	connectTimeoutMS => 10**10,
-	socketTimeoutMS => 10**10
-);
-
-my $db = $client->get_database('nbody');
-my $col = $db->get_collection('data');
-$col->delete_many({}); #Clear collection
-$col->insert_many(\@particles); #Insert all particles
 
 ####Sanity Check, make a plot
 my $chart = Chart::Gnuplot->new(

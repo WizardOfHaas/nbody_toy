@@ -9,10 +9,11 @@ c Setup variables
 	integer n_source, n_test, dt
 	real, dimension(:), allocatable :: x, y, z, vx, vy, vz, fx, fy, fz
 	real, dimension(:), allocatable :: m, type
-	real, dimension(:), allocatable :: test_points
-	character(len=32) :: test_file, tmp
+	character(len=32) :: tmp
 	real, parameter :: sp = 10E-11
-	integer :: tid, j, i
+	integer, parameter :: threads = 4
+	integer :: tid, j, i, batch_size
+	integer :: test_point_start, test_point_end
 
 c Read in initial parameters
 	open(unit = 1, file = "config/params.dat")
@@ -34,25 +35,23 @@ c Read in source points
 	close(1)
 
 c Read in test points
-	call getarg(1, test_file) !Arg 1 - test point file
-	call getarg(2, tmp) !Arg 2 - # test points
-	read(tmp, *) n_test
-	allocate(test_points(n_test))
+	call getarg(1, tmp) !Arg 1 - 1st test point
+	read(tmp, *), test_point_start
+	call getarg(2, tmp) !Arg 2 - Last test point
+	read(tmp, *) test_point_end
+	n_test = test_point_end - test_point_start !Get # of test points
 
-	open(unit = 1, file = test_file)
-	do i = 1, n_test
-		read(1, *) test_points(n_test)
-	end do
-	close(1)
+	batch_size = n_test / threads + 1
 
 c Calculate force/location/velocity in parallel
-!$OMP PARALLEL PRIVATE(tid) SHARED(x,y,z) NUM_THREADS(4)
+!$OMP PARALLEL PRIVATE(tid) SHARED(x,y,z,vx,vy,vz,fx,fy,fz) NUM_THREADS(threads)
 c 	Get thread ID
 	tid = omp_get_thread_num()
 	print *, tid
+	print *, tid * batch_size + 1, (tid + 1) * batch_size
 
 c 	For each test particle i
-	do i = 1, n_test
+	do i = tid * batch_size + 1, (tid + 1) * batch_size
 c 		Set force components to 0
 		fx(i) = 0
 		fy(i) = 0
@@ -60,7 +59,7 @@ c 		Set force components to 0
 
 		do j = 1, n_source
 
-		if(test_points(i) /= j) then
+		if(i /= j) then
 c 			Calculate force cuased by some source particle j
 			fx(i) = m(i) * m(j) / (x(i) - x(j) + sp)**2 * (x(i) - x(j))
 			fy(i) = m(i) * m(j) / (y(i) - y(j) + sp)**2 * (y(i) - y(j))

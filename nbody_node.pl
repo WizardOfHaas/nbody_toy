@@ -46,7 +46,8 @@ my $t = 0;
 
 #################################Write config files for FORTRAN
 open my $fh, ">", "config/params.dat";
-print $fh $num_particles;
+print $fh $num_particles."\n";
+print $fh $dt;
 #################################
 
 my @particles;

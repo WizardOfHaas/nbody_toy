@@ -13,5 +13,6 @@
 	"fract_composition": {
 		"DM": 0.95,
 		"baryon": 0.05
-	}
+	},
+	"v0": 5
 }
