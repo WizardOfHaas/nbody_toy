@@ -1,5 +1,10 @@
 	program calc_particles
 
+	implicit none
+
+!$    integer OMP_GET_THREAD_NUM
+!$    external OMP_GET_THREAD_NUM
+
 c Setup variables
 	integer n_source, n_test, dt
 	real, dimension(:), allocatable :: x, y, z, vx, vy, vz, fx, fy, fz
@@ -7,7 +12,7 @@ c Setup variables
 	real, dimension(:), allocatable :: test_points
 	character(len=32) :: test_file, tmp
 	real, parameter :: sp = 10E-11
-	integer :: tid
+	integer :: tid, j, i
 
 c Read in initial parameters
 	open(unit = 1, file = "config/params.dat")
@@ -41,9 +46,10 @@ c Read in test points
 	close(1)
 
 c Calculate force/location/velocity in parallel
-!$OMP PARALLEL PRIVATE(TID) NUM_THREADS 4
+!$OMP PARALLEL PRIVATE(tid) SHARED(x,y,z) NUM_THREADS(4)
 c 	Get thread ID
 	tid = omp_get_thread_num()
+	print *, tid
 
 c 	For each test particle i
 	do i = 1, n_test
@@ -81,4 +87,4 @@ c Write to output
 	end do
 	close(1)
 
-	end
+	end program
