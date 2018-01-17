@@ -10,38 +10,25 @@ use Parallel::ForkManager;
 
 #################################Parameter Set
 #Constants
-my $G = 6.6*10**-11;
-my $sp = 1*10**-1;
+my $G = 1;
+my $v0 = $cfg->{v0};
+my $sp = $cfg->{sp};
 
 #N Body parameter set
-my $particle_types = {
-	"DM" => {
-		mass => 1, #Free parameter
-		density => 10 #Free parameter
-	},
-	"baryon" => {
-		mass => 10, #Set to neutron or quark mass
-		density => 1 #'' '' '' '' '' density
-	}
-};
+my $particle_types = $cfg->{particle_types};
 
 #Initilization parameters
-my $field_size = 10000;
-my $num_density = 2;
-my $num_particles = $num_density * ($field_size**3);
+my $field_size = $cfg->{field_size};
+my $num_particles = $cfg->{num_particles};
 
-my $fract_composition = {
-	"DM" => 0.95,
-	"baryon" => 0.05
-};
+my $num_density = $num_particles / $field_size**3;
+print "Number Density: ".$num_density."\n";
+
+my $fract_composition = $cfg->{fract_composition};
 
 #Field friction/ram pressure params
-my $field_density = 10;
+my $field_density = 0.1;
 my $friction_coef = 0.1;
-
-#Time parameters
-my $dt = 100*24*60*60;
-my $t = 0;
 #################################Parameter Set
 
 #################################Write config files for FORTRAN
@@ -77,8 +64,6 @@ while(1){
 	write_configs();
 
 	$t += $dt;
-
-
 
 	#Run timestep
 	#@particles = @{calc_forces(\@particles)};

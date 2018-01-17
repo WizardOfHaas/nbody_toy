@@ -8,6 +8,7 @@ use MongoDB;
 use Chart::Gnuplot;
 use JSON qw(decode_json);
 
+#Read in config file
 open my $fh, "<", $ARGV[0];
 my $cfg = decode_json(join("\n", <$fh>));
 close $fh;
@@ -15,60 +16,62 @@ close $fh;
 #################################Parameter Set
 #Constants
 my $G = 1;
-my $v0 = 5;
+my $v0 = $cfg->{v0};
+my $dt = $cfg->{dt};
+my $sp = $cfg->{sp};
 
 #N Body parameter set
-my $particle_types = {
-	"DM" => {
-		mass => 1, #Free parameter
-		density => 1 #Free parameter
-	},
-	"baryon" => {
-		mass => 10, #Set to neutron or quark mass
-		density => 1 #'' '' '' '' '' density
-	}
-};
+my $particle_types = $cfg->{particle_types};
 
 #Initilization parameters
-my $field_size = 10**15;
-#my $num_density = 2**10^-2;
-#my $num_particles = $num_density * ($field_size**3);
-my $num_particles = 100;
+my $field_size = $cfg->{field_size};
+my $num_particles = $cfg->{num_particles};
 
 my $num_density = $num_particles / $field_size**3;
 print "Number Density: ".$num_density."\n";
 
-my $fract_composition = {
-	"DM" => 0.95,
-	"baryon" => 0.05
-};
+my $fract_composition = $cfg->{fract_composition};
 
 #Field friction/ram pressure params
 my $field_density = 0.1;
 my $friction_coef = 0.1;
+
+#Get how should we divvy up to nodes?
+my $n_per_node = $num_particles / scalar @{$cfg->{nodes}};
 #################################Parameter Set
 
 my @particles;
 
 init_particles(); #Get initial particle states
 
-####Sanity Check, make a plot
-my $chart = Chart::Gnuplot->new(
-	output => "field.ps"
-);
+#Set some starting params
+my $t = 0;
+while(1){
 
-my @x = map { $_->{location}->[0] } @particles;
-my @y = map { $_->{location}->[1] } @particles;
-my @z = map { $_->{location}->[2] } @particles;
+	my $t_clean = sprintf("%010d", $t);
+	print "t = ".$t_clean."\n";
 
-my $data = Chart::Gnuplot::DataSet->new(
-    xdata => \@x,
-    ydata => \@y,
-    zdata => \@z,
-    style => 'points'
-);
+	write_configs(); #Write out source particles
 
-$chart->plot3d($data);
+	my $i = 0;
+	foreach my $node(@{$cfg->{nodes}}){ #Write conf for each node
+		my $node_conf_path = "config/params.".$node.".dat";
+		open my $node_conf, ">", $node_conf_path or die $!;
+
+		print $node_conf $num_particles."\n";
+		print $node_conf $dt."\n";
+		print $node_conf ($i * $n_per_node + 1)."\t".(($i + 1) * $n_per_node)."\n";
+		print $node_conf $sp."\n";
+
+		$i++;
+	}
+
+	`./nbody_step n0.dat`;
+
+	`mv output/source_points.dat output/source_points.$t_clean.dat`;
+
+	$t += $dt;
+}
 
 #Init particle field
 sub init_particles{
@@ -116,4 +119,27 @@ sub init_particles{
 			$id++; #Get unique id for each particle
 		}
 	}
+}
+
+#Write out data for FORTRAN code
+sub write_configs{
+	#Write out source point data
+	open my $out, ">", "config/source_points.dat";
+
+	for(my $i = 0; $i < scalar @particles; $i++){
+		my $p = $particles[$i];
+		print $out
+			$p->{location}->[0]."\t".
+			$p->{location}->[1]."\t".
+			$p->{location}->[2]."\t".
+			$p->{velocity}->[0]."\t".
+			$p->{velocity}->[1]."\t".
+			$p->{velocity}->[2]."\t".
+			$p->{force}->[0]."\t".
+			$p->{force}->[1]."\t".
+			$p->{force}->[2]."\t".
+			$p->{mass}."\n";
+	}
+
+	close($out);
 }

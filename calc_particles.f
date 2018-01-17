@@ -9,17 +9,26 @@ c Setup variables
 	integer n_source, n_test, dt
 	real, dimension(:), allocatable :: x, y, z, vx, vy, vz, fx, fy, fz
 	real, dimension(:), allocatable :: m, type
-	character(len=32) :: tmp
+	character(len=128) :: tmp, conf_path
 	real, parameter :: sp = 10E-11
 	integer, parameter :: threads = 4
 	integer :: tid, j, i, batch_size
 	integer :: test_point_start, test_point_end
 
+c Read in args
+	call getarg(1, tmp)
+	conf_path = "config/params." // tmp // ".dat"
+	print *, conf_path
+
 c Read in initial parameters
-	open(unit = 1, file = "config/params.dat")
+	open(unit = 1, file = conf_path)
 	read(1, *) n_source
 	read(1, *) dt
+	read(1, *) test_point_start, test_point_end
 	close(1)
+
+	n_test = test_point_end - test_point_start
+	batch_size = n_test / threads + 1
 
 c Deal with stupid fortran arrays
 	allocate(x(n_source), y(n_source), z(n_source))
@@ -33,15 +42,6 @@ c Read in source points
 		read(1, *) x(i), y(i), z(i), vx(i), vy(i), vz(i), fx(i), fy(i), fz(i), m(i)
 	end do
 	close(1)
-
-c Read in test points
-	call getarg(1, tmp) !Arg 1 - 1st test point
-	read(tmp, *), test_point_start
-	call getarg(2, tmp) !Arg 2 - Last test point
-	read(tmp, *) test_point_end
-	n_test = test_point_end - test_point_start !Get # of test points
-
-	batch_size = n_test / threads + 1
 
 c Calculate force/location/velocity in parallel
 !$OMP PARALLEL PRIVATE(tid) SHARED(x,y,z,vx,vy,vz,fx,fy,fz) NUM_THREADS(threads)
@@ -81,7 +81,7 @@ c 			Calculate new velocity
 
 c Write to output
 	open(unit = 1, file = "output/source_points.dat")
-	do i = 1, n_source
+	do i = test_point_start, test_point_end
 		write(1, *) x(i), y(i), z(i), vx(i), vy(i), vz(i), fx(i), fy(i), fz(i), m(i)
 	end do
 	close(1)
