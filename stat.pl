@@ -8,26 +8,36 @@ use MongoDB;
 use Chart::Gnuplot;
 use List::Util qw(sum);
 
-#Pull from database
-my $client = MongoDB::MongoClient->new(host => 'localhost', port => 27017);
-my $db = $client->get_database('nbody');
-my $col = $db->get_collection('data');
-
-my $ret = $col->distinct("t");
-
 my @ts;
 my @std_r;
 my @std_v;
 my @ave_r;
 my @ave_v;
 
-foreach my $t(sort {$b <=> $a} @{$ret->{_docs}}){
-	my $d = $col->find({t => $t});
+foreach my $file(sort {$a cmp $b} glob("output/source_points.dat.*")){
+	open my $fh, "<", $file;
+	my @particles;
+
+	my ($t) = $file =~ m/points\.dat\.([0-9]*)/; #Parse out timestamp
+
+	while(<$fh>){
+		my @f = split(/\s+/, $_);
+		shift(@f);
+
+		push(@particles, {
+			location => [0+ $f[0], 0+ $f[1], 0+ $f[2]],
+			force => [0+ $f[3], 0+ $f[4], 0+ $f[5]],
+			velocity => [0+ $f[6], 0+ $f[7], 0+ $f[8]],
+			type => "DM",
+			t => 0+ $t,
+			mass => 0+ $f[9]
+		});
+	}	
 
 	my @vs;
 	my @rs;
 
-	while(my $p = $d->next){
+	foreach my $p(@particles){
 		my $r = sqrt(
 			$p->{location}->[0]**2 +
 			$p->{location}->[1]**2 +
@@ -53,7 +63,7 @@ foreach my $t(sort {$b <=> $a} @{$ret->{_docs}}){
 	my $v_std = sqrt($ave_sq_v - $ave_v**2);
 	my $r_std = sqrt($ave_sq_r - $ave_r**2);
 
-	print join("\t", (
+	print join(",", (
 		$t,
 		$ave_v,
 		$v_std,
