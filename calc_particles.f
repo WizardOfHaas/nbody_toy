@@ -6,7 +6,8 @@
 !$    external OMP_GET_THREAD_NUM
 
 c Setup variables
-	integer n_source, n_test, dt, t
+	integer n_source, n_test, dt
+	integer(kind=8) :: t
 	real, dimension(:), allocatable :: x, y, z, vx, vy, vz, fx, fy, fz
 	real, dimension(:), allocatable :: m, type
 	character(len=128) :: tmp, conf_path
@@ -44,7 +45,9 @@ c Read in source points
 	end do
 	close(1)
 
-	do t = 0, 10000 * dt, dt
+	t = 0
+
+	do
 c 	Calculate force/location/velocity in parallel
 	
 		print *, t
@@ -85,12 +88,15 @@ c 			Calculate new velocity
 !$OMP END PARALLEL	
 
 c 		Write to output
-		write(tmp, '(A,I10.10)') "output/source_points.dat.", t 
+		write(tmp, '(A,I20.20)') "output/source_points.dat.", t 
 		open(unit = 1, file = tmp)
 		do i = test_point_start, test_point_end
 			write(1, *) x(i), y(i), z(i), vx(i), vy(i), vz(i), fx(i), fy(i), fz(i), m(i)
 		end do
 		close(1)
+
+	t = t + dt
+
 	end do
 
 	end program

@@ -83,7 +83,7 @@ foreach my $t(@{$ret->{_docs}}){
 	
 	print "t = $t\n";
 
-	my $t_clean = sprintf "%010d", $t;
+	my $t_clean = sprintf "%020d", $t;
 
 	my $chart = Chart::Gnuplot->new(
 		title => "t = $t_clean",

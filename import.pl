@@ -17,22 +17,30 @@ $col->delete_many({});
 my $forks = 4;
 my $pm = new Parallel::ForkManager($forks);
 
-foreach my $file(glob("output/source_points.*.dat")){
+my @ts;
+foreach my $file(glob("output/source_points.dat.*")){
+	my ($t) = $file =~ m/points\.dat\.([0-9]*)/;
+	my $mod = (0+ $t) % (86400 * 100);
+
+	if($mod == 0){
+		push(@ts, $t);
+	}
+}
+
+foreach my $t(@ts){
 	my $pid = $pm->start and next;
 	$client->reconnect;
 
-	my ($t) = $file =~ m/points\.([0-9]*)\.dat/; #Parse out timestamp
-
-	print $t."\n";
+	print $t."\n";	
 
 	#Parse file
 	if($t){
-		open my $fh, "<", $file;
-		my @particles;
+		open my $fh, "<", "output/source_points.dat.$t";
+		my @particles;	
 
 		while(<$fh>){
 			my @f = split(/\s+/, $_);
-			shift(@f);
+			shift(@f);	
 
 			push(@particles, {
 				location => [0+ $f[0], 0+ $f[1], 0+ $f[2]],
@@ -42,7 +50,7 @@ foreach my $file(glob("output/source_points.*.dat")){
 				t => 0+ $t,
 				mass => 0+ $f[9]
 			});
-		}
+		}	
 
 		$col->insert_many(\@particles);
 	}

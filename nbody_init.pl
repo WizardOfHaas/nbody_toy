@@ -43,7 +43,6 @@ my $n_per_node = $num_particles / scalar @{$cfg->{nodes}};
 my @particles;
 
 init_particles(); #Get initial particle states
-die;
 
 #Set some starting params
 my $t = 0;
@@ -67,7 +66,11 @@ while(1){
 		$i++;
 	}
 
+	die;
+	
 	`./nbody_step n0.dat`;
+
+	die;
 
 	`cp output/source_points.dat config/source_points.dat`;
 	`mv output/source_points.dat output/source_points.$t_clean.dat`;
