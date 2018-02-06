@@ -26,11 +26,10 @@ foreach my $file(sort {$a cmp $b} glob("output/source_points.dat.*")){
 
 		push(@particles, {
 			location => [0+ $f[0], 0+ $f[1], 0+ $f[2]],
-			force => [0+ $f[3], 0+ $f[4], 0+ $f[5]],
-			velocity => [0+ $f[6], 0+ $f[7], 0+ $f[8]],
+			velocity => [0+ $f[3], 0+ $f[4], 0+ $f[5]],
 			type => "DM",
 			t => 0+ $t,
-			mass => 0+ $f[9]
+			mass => 0+ $f[6]
 		});
 	}	
 

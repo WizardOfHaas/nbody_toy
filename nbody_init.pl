@@ -36,8 +36,6 @@ my $fract_composition = $cfg->{fract_composition};
 my $field_density = 0.1;
 my $friction_coef = 0.1;
 
-#Get how should we divvy up to nodes?
-my $n_per_node = $num_particles / scalar @{$cfg->{nodes}};
 #################################Parameter Set
 
 my @particles;
@@ -53,21 +51,16 @@ while(1){
 
 	write_configs(); #Write out source particles
 
-	my $i = 0;
-	foreach my $node(@{$cfg->{nodes}}){ #Write conf for each node
-		my $node_conf_path = "config/params.".$node.".dat";
-		open my $node_conf, ">", $node_conf_path or die $!;
+	my $node_conf_path = "config/params.dat";
+	open my $node_conf, ">", $node_conf_path or die $!;
 
-		print $node_conf $num_particles."\n";
-		print $node_conf $dt."\n";
-		print $node_conf ($i * $n_per_node + 1)."\t".(($i + 1) * $n_per_node)."\n";
-		print $node_conf $sp."\n";
-
-		$i++;
-	}
+	print $node_conf $num_particles."\n";
+	print $node_conf $dt."\n";
+	print $node_conf "1\t$num_particles\n";
+	print $node_conf $sp."\n";
 
 	die;
-	
+
 	`./nbody_step n0.dat`;
 
 	die;
@@ -140,9 +133,6 @@ sub write_configs{
 			$p->{velocity}->[0]."\t".
 			$p->{velocity}->[1]."\t".
 			$p->{velocity}->[2]."\t".
-			$p->{force}->[0]."\t".
-			$p->{force}->[1]."\t".
-			$p->{force}->[2]."\t".
 			$p->{mass}."\n";
 	}
 

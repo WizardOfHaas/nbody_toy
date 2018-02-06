@@ -20,7 +20,7 @@ my $pm = new Parallel::ForkManager($forks);
 my @ts;
 foreach my $file(glob("output/source_points.dat.*")){
 	my ($t) = $file =~ m/points\.dat\.([0-9]*)/;
-	my $mod = (0+ $t) % (86400 * 100);
+	my $mod = (0+ $t) % (864000 * 100);
 
 	if($mod == 0){
 		push(@ts, $t);

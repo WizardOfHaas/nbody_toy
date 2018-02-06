@@ -11,14 +11,14 @@ c Setup variables
 	real, dimension(:), allocatable :: x, y, z, vx, vy, vz, fx, fy, fz
 	real, dimension(:), allocatable :: m, type
 	character(len=128) :: tmp, conf_path
-	integer, parameter :: threads = 4
-	integer :: tid, j, i, batch_size
+	integer, parameter :: threads = 1
+	integer :: tid, j, i, batch_size, k
 	integer :: test_point_start, test_point_end
 	real :: sp
 
 c Read in args
 	call getarg(1, tmp)
-	conf_path = "config/params." // tmp // ".dat"
+	conf_path = "config/params.dat"
 	print *, conf_path
 
 c Read in initial parameters
@@ -41,7 +41,7 @@ c Deal with stupid fortran arrays
 c Read in source points
 	open(unit = 1, file = "config/source_points.dat")
 	do i = 1, n_source
-		read(1, *) x(i), y(i), z(i), vx(i), vy(i), vz(i), fx(i), fy(i), fz(i), m(i)
+		read(1, *) x(i), y(i), z(i), vx(i), vy(i), vz(i), m(i)
 	end do
 	close(1)
 
@@ -50,9 +50,9 @@ c Read in source points
 	do
 c 	Calculate force/location/velocity in parallel
 	
-		print *, t
+		print *, t / 3.15E7
 
-!$OMP PARALLEL PRIVATE(tid) SHARED(x,y,z,vx,vy,vz,fx,fy,fz) NUM_THREADS(threads)
+!$OMP PARALLEL PRIVATE(tid) SHARED(x,y,z,vx,vy,vz) NUM_THREADS(threads)
 c 		Get thread ID
 		tid = omp_get_thread_num()
 c		print *, tid
@@ -60,28 +60,19 @@ c		print *, tid * batch_size + 1, (tid + 1) * batch_size
 
 c 		For each test particle i
 		do i = tid * batch_size + 1, (tid + 1) * batch_size
-c 			Set force components to 0
-			fx(i) = 0
-			fy(i) = 0
-			fz(i) = 0	
-
 			do j = 1, n_source	
 
-			if(i /= j) then
-c 				Calculate force cuased by some source particle j
-				fx(i) = m(i) * m(j) / (x(i) - x(j) + sp)**2 * (x(i) - x(j))
-				fy(i) = m(i) * m(j) / (y(i) - y(j) + sp)**2 * (y(i) - y(j))
-				fz(i) = m(i) * m(j) / (z(i) - z(j) + sp)**2 * (z(i) - z(j))
-			end if	
-
 c 			Calculate new location
-			x(i) = fx(i) * (dt)**2 / (2 * m(i)) + dt * vx(i) + x(i)
-			y(i) = fy(i) * (dt)**2 / (2 * m(i)) + dt * vy(i) + y(i)
-			z(i) = fz(i) * (dt)**2 / (2 * m(i)) + dt * vz(i) + z(i)
-c 			Calculate new velocity
-			vx(i) = fx(i) * dt / m(i) + vx(i)
-			vy(i) = fy(i) * dt / m(i) + vy(i)
-			vz(i) = fz(i) * dt / m(i) + vz(i)	
+			x(i) = dt * vx(i) + x(i)
+			y(i) = dt * vy(i) + y(i)
+			z(i) = dt * vz(i) + z(i)
+
+			if(i /= j) then
+c 				Calculate velocity cuased by some source particle j
+				vx(i) = sqrt(m(i) * 1 / abs((x(j) - x(i)))) * sign(1.0, x(j) - x(i))
+				vy(i) = sqrt(m(i) * 1 / abs((y(j) - y(i)))) * sign(1.0, y(j) - y(i))
+				vz(i) = sqrt(m(i) * 1 / abs((z(j) - z(i)))) * sign(1.0, z(j) - z(i))
+			end if	
 
 			end do
 		end do
@@ -91,7 +82,7 @@ c 		Write to output
 		write(tmp, '(A,I20.20)') "output/source_points.dat.", t 
 		open(unit = 1, file = tmp)
 		do i = test_point_start, test_point_end
-			write(1, *) x(i), y(i), z(i), vx(i), vy(i), vz(i), fx(i), fy(i), fz(i), m(i)
+			write(1, *) x(i), y(i), z(i), vx(i), vy(i), vz(i), m(i)
 		end do
 		close(1)
 
