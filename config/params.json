@@ -2,7 +2,7 @@
 	"sp": 1E-1,
 	"num_particles": 10,
 	"field_size": 100,
-	"dt": 864000,
+	"dt": 60,
 	"particle_types": {
 		"DM": {
 			"mass": 1
@@ -12,8 +12,8 @@
 		}
 	},
 	"fract_composition": {
-		"DM": 0.95,
-		"baryon": 0.05
+		"DM": 0.9,
+		"baryon": 0.1
 	},
 	"v0": 15
 }

@@ -133,7 +133,9 @@ sub write_configs{
 			$p->{velocity}->[0]."\t".
 			$p->{velocity}->[1]."\t".
 			$p->{velocity}->[2]."\t".
-			$p->{mass}."\n";
+			$p->{mass}."\t".
+			($p->{type} eq "DM" ? 1 : 0)."\t".
+			"0\n";
 	}
 
 	close($out);

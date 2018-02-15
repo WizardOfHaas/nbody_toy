@@ -35,6 +35,7 @@ foreach my $file(sort {$a cmp $b} glob("output/source_points.dat.*")){
 
 	my @vs;
 	my @rs;
+	my (@xs, @ys, @zs);
 
 	foreach my $p(@particles){
 		my $r = sqrt(
@@ -51,23 +52,45 @@ foreach my $file(sort {$a cmp $b} glob("output/source_points.dat.*")){
 
 		push(@rs, $r);	
 		push(@vs, $v);
+
+		push(@xs, $p->{location}->[0]);
+		push(@ys, $p->{location}-->[1]);
+		push(@zs, $p->{location}-->[2]);
 	}
 
 	my $ave_v = sum(@vs) / scalar @vs;
 	my $ave_r = sum(@rs) / scalar @rs;
 
+	my $ave_x = sum(@xs) / scalar @xs;
+	my $ave_y = sum(@ys) / scalar @ys;
+	my $ave_z = sum(@zs) / scalar @zs;
+
 	my $ave_sq_v = sum(map { $_**2 } @vs) / scalar @vs;
 	my $ave_sq_r = sum(map { $_**2 } @rs) / scalar @rs;
 
+	my $ave_sq_x = sum(map { $_**2 } @xs) / scalar @xs;
+	my $ave_sq_y = sum(map { $_**2 } @ys) / scalar @ys;
+	my $ave_sq_z = sum(map { $_**2 } @zs) / scalar @zs;
+
 	my $v_std = sqrt($ave_sq_v - $ave_v**2);
 	my $r_std = sqrt($ave_sq_r - $ave_r**2);
+
+	my $x_std = sqrt($ave_sq_x - $ave_x**2);
+	my $y_std = sqrt($ave_sq_y - $ave_y**2);
+	my $z_std = sqrt($ave_sq_z - $ave_z**2);
 
 	print join(",", (
 		$t,
 		$ave_v,
 		$v_std,
 		$ave_r,
-		$r_std
+		$r_std,
+		$ave_x,
+		$x_std,
+		$ave_y,
+		$y_std,
+		$ave_z,
+		$z_std
 	))."\n";
 
 	push(@ts, $t);

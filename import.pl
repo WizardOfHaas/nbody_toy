@@ -14,13 +14,13 @@ my $db = $client->get_database('nbody');
 my $col = $db->get_collection('data');
 $col->delete_many({});
 
-my $forks = 4;
+my $forks = 2;
 my $pm = new Parallel::ForkManager($forks);
 
 my @ts;
 foreach my $file(glob("output/source_points.dat.*")){
 	my ($t) = $file =~ m/points\.dat\.([0-9]*)/;
-	my $mod = (0+ $t) % (864000 * 100);
+	my $mod = (0+ $t) % (60 * 60);
 
 	if($mod == 0){
 		push(@ts, $t);
@@ -44,11 +44,10 @@ foreach my $t(@ts){
 
 			push(@particles, {
 				location => [0+ $f[0], 0+ $f[1], 0+ $f[2]],
-				force => [0+ $f[3], 0+ $f[4], 0+ $f[5]],
-				velocity => [0+ $f[6], 0+ $f[7], 0+ $f[8]],
+				velocity => [0+ $f[3], 0+ $f[4], 0+ $f[5]],
 				type => "DM",
 				t => 0+ $t,
-				mass => 0+ $f[9]
+				mass => 0+ $f[6]
 			});
 		}	
 

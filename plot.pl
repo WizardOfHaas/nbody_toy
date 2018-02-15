@@ -72,7 +72,7 @@ my @z_range = (
 
 my $ret = $col->distinct("t");
 
-my $forks = 4;
+my $forks = 2;
 my $pm = new Parallel::ForkManager($forks);
 
 `rm -rf plots/*`;
